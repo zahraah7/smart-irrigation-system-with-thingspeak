@@ -1,0 +1,79 @@
+#include <WiFi.h>
+#include <DHT.h> 
+#include "ThingSpeak.h"
+#define DHTPIN 4        //pin where the dht11 is connected 
+#define DHTTYPE DHT11 
+DHT dht(DHTPIN,DHTTYPE );
+const int pin = 34;     //pin where the soil moisture sensor is connected
+const int Air = 3970;
+const int Water = 1620;
+int soilread;
+int soilpercent;
+
+const char* ssid = "IoT MakerSpace";   
+const char* password = "12345678k";   
+
+WiFiClient  client;
+
+unsigned long Channel_ID = 1532390;
+const char * API_Key = "2IDC2J9FR6H2KCHS";
+
+unsigned long last_time = 0;
+unsigned long Delay = 30000;
+
+// Variables to store dht sensor readings
+float temperature;
+float humidity;
+
+
+
+
+void setup() {
+  Serial.begin(115200);  
+  dht.begin();
+  WiFi.mode(WIFI_STA);   
+  
+  ThingSpeak.begin(client); 
+}
+
+void loop() {
+  if ((millis() - last_time) > Delay) {
+    
+    // Connect or reconnect to WiFi
+    if(WiFi.status() != WL_CONNECTED){
+      Serial.print("Connecting...");
+      while(WiFi.status() != WL_CONNECTED){
+        WiFi.begin(ssid, password); 
+        delay(5000);     
+      } 
+      Serial.println("\nConnected.");
+    }
+
+    // Obtaining a new sensor reading for all fields
+    temperature = dht.readTemperature();
+    Serial.print("Temperature (ºC): ");
+    Serial.println(temperature);
+    humidity = dht.readHumidity();
+    Serial.print("Humidity (%): ");
+    Serial.println(humidity);
+    
+    soilread = analogRead(pin);
+    soilpercent = map(soilread, Air, Water, 0, 100);
+    Serial.print("soil moisture level: ");
+    Serial.println(soilpercent);
+    
+    ThingSpeak.setField(1,soilpercent );
+    ThingSpeak.setField(2, temperature);
+    ThingSpeak.setField(3, humidity);
+   
+    int Data = ThingSpeak.writeFields(Channel_ID, API_Key);
+
+    if(Data == 200){
+      Serial.println("Channel updated successfully!");
+    }
+    else{
+      Serial.println("Problem updating channel. HTTP error code " + String(Data));
+    }
+    last_time = millis();
+  }
+}
